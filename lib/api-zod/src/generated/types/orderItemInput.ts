@@ -6,6 +6,9 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface HealthStatus {
-  status: string;
+export interface OrderItemInput {
+  productId: number;
+  /** @minimum 1 */
+  quantity: number;
+  price: number;
 }

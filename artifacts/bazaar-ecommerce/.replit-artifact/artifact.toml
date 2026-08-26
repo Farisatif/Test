@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Bazaar E-commerce Store"
+description = "A complete, responsive e-commerce storefront with product discovery, product details, cart and checkout flows, plus an admin-ready API foundation for managing catalog and orders."
+version = "1.0.0"
+id = "artifacts/bazaar-ecommerce"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22498
+
+[services.development]
+run = "pnpm --filter @workspace/bazaar-ecommerce run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/bazaar-ecommerce", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/bazaar-ecommerce/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22498"
+BASE_PATH = "/"

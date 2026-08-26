@@ -1,0 +1,1 @@
+- [Orval and Zod compatibility](zod-orval-version.md) — verify generated Zod syntax against the workspace's installed Zod major version after API codegen.
