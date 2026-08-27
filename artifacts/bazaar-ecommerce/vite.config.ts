@@ -5,27 +5,8 @@ import { defineConfig } from 'vite';
 
 import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
 
-const rawPort = process.env.PORT;
-
-if (!rawPort) {
-  throw new Error(
-    'PORT environment variable is required but was not provided.',
-  );
-}
-
-const port = Number(rawPort);
-
-if (Number.isNaN(port) || port <= 0) {
-  throw new Error(`Invalid PORT value: "${rawPort}"`);
-}
-
-const basePath = process.env.BASE_PATH;
-
-if (!basePath) {
-  throw new Error(
-    'BASE_PATH environment variable is required but was not provided.',
-  );
-}
+const port = Number(process.env.PORT || 5173);
+const basePath = '/';
 
 export default defineConfig({
   base: basePath,
@@ -61,8 +42,20 @@ export default defineConfig({
   },
   root: path.resolve(import.meta.dirname),
   build: {
-    outDir: path.resolve(import.meta.dirname, 'dist/public'),
+    outDir: path.resolve(import.meta.dirname, '..', '..', 'public', 'build'),
     emptyOutDir: true,
+    cssCodeSplit: false,
+    manifest: false,
+    rollupOptions: {
+      input: path.resolve(import.meta.dirname, 'src/main.tsx'),
+      output: {
+        entryFileNames: 'app.js',
+        chunkFileNames: 'chunks/[name]-[hash].js',
+        assetFileNames: (assetInfo) => assetInfo.name?.endsWith('.css')
+          ? 'style.css'
+          : 'assets/[name]-[hash][extname]',
+      },
+    },
   },
   server: {
     port,

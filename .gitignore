@@ -7,10 +7,8 @@ out-tsc
 *.tsbuildinfo
 .expo
 .expo-shared
-
 # dependencies
 node_modules
-
 # IDEs and editors
 /.idea
 .project
@@ -19,14 +17,12 @@ node_modules
 *.launch
 .settings/
 *.sublime-workspace
-
 # IDE - VSCode
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
-
 # misc
 /.sass-cache
 /connect.lock
@@ -36,14 +32,35 @@ npm-debug.log
 yarn-error.log
 testem.log
 /typings
-
 # System Files
 .DS_Store
 Thumbs.db
-
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
-
 # Replit
 .cache/
 .local/
+*.log
+.env
+.env.backup
+.env.production
+.phpactor.json
+.phpunit.result.cache
+/.codex
+/.cursor/
+/.nova
+/.phpunit.cache
+/.vscode
+/.zed
+/auth.json
+/node_modules
+/public/build
+/public/fonts-manifest.dev.json
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/vendor
+_ide_helper.php
+Homestead.json
+Homestead.yaml
