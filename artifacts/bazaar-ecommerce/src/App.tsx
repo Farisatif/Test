@@ -1,6 +1,9 @@
 import { createContext, type ChangeEvent, type FormEvent, type ReactNode, useContext, useEffect, useMemo, useState } from 'react';
-import { Link, Route, Router as WouterRouter, Switch, useLocation, useParams } from 'wouter';
+import { Link, Redirect, Route, Router as WouterRouter, Switch, useLocation, useParams } from 'wouter';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ClerkProvider, Show, SignIn, SignUp, useAuth, useClerk, useUser } from '@clerk/react';
+import { publishableKeyFromHost } from '@clerk/react/internal';
+import { shadcn } from '@clerk/themes';
 import {
   ArrowLeft,
   ArrowRight,
@@ -40,6 +43,71 @@ import NotFound from '@/pages/not-found';
 import './index.css';
 
 const queryClient = new QueryClient();
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
+const clerkPubKey = publishableKeyFromHost(
+  window.location.hostname,
+  import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
+);
+const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+
+if (!clerkPubKey) {
+  throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY in .env file');
+}
+
+function stripBase(path: string): string {
+  return basePath && path.startsWith(basePath)
+    ? path.slice(basePath.length) || '/'
+    : path;
+}
+
+const clerkAppearance = {
+  theme: shadcn,
+  cssLayerName: 'clerk',
+  options: {
+    logoPlacement: 'inside' as const,
+    logoLinkUrl: basePath || '/',
+    logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
+  },
+  variables: {
+    colorPrimary: '#B2054C',
+    colorForeground: '#4D092B',
+    colorMutedForeground: '#806A67',
+    colorDanger: '#D10056',
+    colorBackground: '#FBFAF6',
+    colorInput: '#F7F4ED',
+    colorInputForeground: '#4D092B',
+    colorNeutral: '#D8CFC1',
+    fontFamily: 'DM Sans, sans-serif',
+    borderRadius: '1rem',
+  },
+  elements: {
+    rootBox: 'w-full flex justify-center',
+    cardBox: 'bg-[#fbfaf6] rounded-3xl w-[440px] max-w-full overflow-hidden border border-[#e5ded2] shadow-xl',
+    card: '!shadow-none !border-0 !bg-transparent !rounded-none',
+    footer: '!shadow-none !border-0 !bg-transparent !rounded-none',
+    headerTitle: 'font-display text-[#4d092b] font-bold',
+    headerSubtitle: 'text-[#806a67]',
+    socialButtonsBlockButtonText: 'text-[#4d092b] font-bold',
+    formFieldLabel: 'text-[#4d092b] font-bold',
+    footerActionLink: 'text-[#b2054c] font-bold',
+    footerActionText: 'text-[#806a67]',
+    dividerText: 'text-[#806a67]',
+    identityPreviewEditButton: 'text-[#b2054c]',
+    formFieldSuccessText: 'text-[#285d28]',
+    alertText: 'text-[#4d092b]',
+    logoBox: 'mb-2',
+    logoImage: 'h-11 w-11',
+    socialButtonsBlockButton: 'border-[#d8cfc1] bg-[#f7f4ed] hover:bg-[#eee8dc]',
+    formButtonPrimary: 'bg-[#b2054c] hover:bg-[#d10056] text-[#fffaf0] font-bold',
+    formFieldInput: 'border-[#d8cfc1] bg-[#f7f4ed] text-[#4d092b]',
+    footerAction: 'border-t border-[#e5ded2]',
+    dividerLine: 'bg-[#d8cfc1]',
+    alert: 'bg-[#fff1f3] border-[#d10056]',
+    otpCodeFieldInput: 'border-[#d8cfc1] bg-[#f7f4ed] text-[#4d092b]',
+    formFieldRow: 'gap-2',
+    main: 'gap-5',
+  },
+};
 
 type CartLine = { product: Product; quantity: number };
 type CartContextValue = {
@@ -124,6 +192,11 @@ function Header() {
   const { cartCount } = useCart();
   const [location] = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const { isSignedIn } = useAuth();
+  const { user } = useUser();
+  const { signOut } = useClerk();
+  const isAdmin = user?.publicMetadata?.role === 'admin';
+  const firstName = user?.firstName || user?.primaryEmailAddress?.emailAddress?.split('@')[0];
   return <header className="sticky top-0 z-40 border-b border-[#e5ded2] bg-[#f7f4ed]/95 backdrop-blur">
     <div className="mx-auto flex h-[74px] max-w-[1400px] items-center justify-between gap-4 px-5 lg:px-8">
       <button data-testid="button-mobile-menu" onClick={() => setMenuOpen(!menuOpen)} className="rounded-full p-2 text-[#4d092b] md:hidden"><LayoutGrid size={20} /></button>
@@ -138,14 +211,21 @@ function Header() {
       </nav>
       <div className="flex items-center gap-1">
         <Link href="/shop" data-testid="link-search" className="rounded-full p-2.5 text-[#4d092b] hover:bg-[#ece6d9]"><Search size={19} /></Link>
-        <button data-testid="button-account" onClick={() => alert('Account sign-in is coming soon.')} className="hidden rounded-full p-2.5 text-[#4d092b] hover:bg-[#ece6d9] sm:block"><UserRound size={19} /></button>
+        {isSignedIn ? <div className="group relative hidden sm:block">
+          <button data-testid="button-account" className="flex items-center gap-2 rounded-full p-2.5 text-[#4d092b] hover:bg-[#ece6d9]"><UserRound size={19} /><span className="max-w-20 truncate text-xs font-bold">{firstName}</span></button>
+          <div className="invisible absolute right-0 top-12 w-48 translate-y-1 rounded-2xl border border-[#e5ded2] bg-[#fbfaf6] p-2 opacity-0 shadow-xl transition-all group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+            <div className="border-b border-[#e5ded2] px-3 py-2"><p className="truncate text-xs font-bold text-[#4d092b]">{user?.fullName || firstName}</p><p className="truncate text-[10px] text-[#917872]">{user?.primaryEmailAddress?.emailAddress}</p></div>
+            {isAdmin && <Link href="/dashboard" className="mt-1 block rounded-xl px-3 py-2 text-xs font-bold text-[#4d092b] hover:bg-[#f0eadf]">Dashboard</Link>}
+            <button onClick={() => signOut({ redirectUrl: basePath || '/' })} className="mt-1 w-full rounded-xl px-3 py-2 text-left text-xs font-bold text-[#b2054c] hover:bg-[#fff0f3]">Sign out</button>
+          </div>
+        </div> : <Link href="/sign-in" data-testid="button-account" className="hidden rounded-full p-2.5 text-[#4d092b] hover:bg-[#ece6d9] sm:block"><UserRound size={19} /></Link>}
         <Link href="/cart" data-testid="link-cart" className="relative rounded-full p-2.5 text-[#4d092b] hover:bg-[#ece6d9]"><ShoppingBag size={20} />
           {cartCount > 0 && <span data-testid="text-cart-count" className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ffb900] px-1 font-mono text-[10px] font-bold text-[#4d092b]">{cartCount}</span>}
         </Link>
       </div>
     </div>
     {menuOpen && <nav className="border-t border-[#e5ded2] bg-[#f7f4ed] px-5 py-4 md:hidden">
-      <div className="flex flex-col gap-3">{[['/', 'Home'], ['/shop', 'Shop'], ['/shop?category=New', 'New in']].map(([href, label]) =>
+       <div className="flex flex-col gap-3">{[['/', 'Home'], ['/shop', 'Shop'], ['/shop?category=New', 'New in'], ...(isSignedIn ? [['/account', 'My account']] : [['/sign-in', 'Sign in']]), ...(isAdmin ? [['/dashboard', 'Dashboard']] : [])].map(([href, label]) =>
         <Link key={href} href={href} data-testid={`link-mobile-${label.toLowerCase().replace(' ', '-')}`} onClick={() => setMenuOpen(false)} className="border-b border-[#e5ded2] pb-3 text-sm font-bold text-[#4d092b]">{label}</Link>
       )}</div>
     </nav>}
@@ -291,13 +371,113 @@ function AdminPage() {
   return <Shell><main className="mx-auto max-w-[1400px] px-5 py-10 lg:px-8 lg:py-14"><div className="flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><p className="font-mono text-[10px] uppercase tracking-[.2em] text-[#007dcc]">Bazaar / back office</p><h1 className="mt-2 font-display text-5xl font-bold tracking-[-.07em] text-[#4d092b]">Store pulse<span className="text-[#d10056]">.</span></h1></div><span className="rounded-full bg-[#7ec151]/30 px-4 py-2 font-mono text-[10px] uppercase tracking-[.14em] text-[#285d28]">Live overview</span></div>{summaryQuery.isError ? <div className="mt-8"><DataMessage title="Dashboard is catching up." body="We couldn't load the store summary." onRetry={() => summaryQuery.refetch()} /></div> : <><div className="mt-9 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">{[['Products', summary?.totalProducts ?? '—', '#7ec151'], ['Orders', summary?.totalOrders ?? '—', '#ffb900'], ['Revenue', summary ? money(summary.totalRevenue) : '—', '#007dcc'], ['Conversion', summary ? `${summary.conversionRate}%` : '—', '#d10056']].map(([label, value, color]) => <div data-testid={`stat-admin-${String(label).toLowerCase()}`} key={label} className="rounded-2xl border border-[#e5ded2] bg-[#fbfaf6] p-5"><div className="mb-10 h-3 w-3 rounded-full" style={{ background: color as string }} /><p className="font-mono text-[10px] uppercase tracking-[.16em] text-[#917872]">{label}</p><p className="mt-2 font-display text-3xl font-bold tracking-[-.05em] text-[#4d092b]">{value}</p></div>)}</div><div className="mt-12 grid gap-8 lg:grid-cols-[1.2fr_.8fr]"><section className="rounded-3xl border border-[#e5ded2] bg-[#fbfaf6] p-6"><div className="flex items-center justify-between"><div><p className="font-mono text-[10px] uppercase tracking-[.16em] text-[#b2054c]">Catalog health</p><h2 className="mt-2 font-display text-2xl font-bold text-[#4d092b]">Product shelf</h2></div><Link href="/shop" data-testid="link-admin-catalog" className="text-xs font-bold text-[#b2054c]">View shop <ArrowRight size={14} className="ml-1 inline" /></Link></div>{productsQuery.isLoading ? <div className="mt-6 space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-14 animate-pulse rounded-xl bg-[#e8e4d8]" />)}</div> : <div className="mt-6 divide-y divide-[#e5ded2]">{products.slice(0, 6).map(product => <div data-testid={`row-admin-product-${product.id}`} key={product.id} className="flex items-center gap-3 py-3"><div className="h-11 w-10 overflow-hidden rounded-lg bg-[#e9e4d8]"><ProductImage product={product} /></div><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-[#4d092b]">{product.name}</p><p className="text-xs text-[#917872]">{product.category}</p></div><span className="font-mono text-xs text-[#4d092b]">{money(product.price)}</span><span className="rounded-full bg-[#7ec151]/25 px-2 py-1 font-mono text-[9px] uppercase text-[#285d28]">active</span></div>)}</div>}</section><section className="rounded-3xl bg-[#4d092b] p-6 text-[#f7f4ed]"><p className="font-mono text-[10px] uppercase tracking-[.16em] text-[#ffb900]">Operator notes</p><h2 className="mt-2 font-display text-2xl font-bold">Keep the shelves feeling fresh.</h2><div className="mt-8 space-y-4 text-sm leading-6 text-[#dfcbd0]"><p className="border-l-2 border-[#7ec151] pl-4">Your featured edit is what shoppers see first. Keep it tight and surprising.</p><p className="border-l-2 border-[#007dcc] pl-4">A clear product photo and honest description does more than a dozen badges.</p><p className="border-l-2 border-[#ffb900] pl-4">Orders and revenue are synced from the live storefront.</p></div><Link href="/" data-testid="link-admin-storefront" className="mt-9 inline-flex items-center gap-2 rounded-full bg-[#ffb900] px-5 py-3 text-sm font-bold text-[#4d092b]">See storefront <ArrowRight size={16} /></Link></section></div></>}</main></Shell>;
 }
 
+function AuthPage({ mode }: { mode: 'sign-in' | 'sign-up' }) {
+  const isSignIn = mode === 'sign-in';
+  return <main className="bazaar-grain flex min-h-[100dvh] items-center justify-center bg-[#f7f4ed] px-5 py-12">
+    <div className="w-full max-w-[520px]">
+      <Link href="/" className="mx-auto mb-8 flex w-fit items-center gap-2">
+        <span className="flex h-9 w-9 rotate-[-8deg] items-center justify-center rounded-[11px] bg-[#b2054c] text-[#f7f4ed]"><Sparkles size={19} /></span>
+        <span className="font-display text-2xl font-bold tracking-[-.06em] text-[#4d092b]">bazaar<span className="text-[#d10056]">.</span></span>
+      </Link>
+      <div className="mb-5 text-center">
+        <p className="font-mono text-[10px] uppercase tracking-[.2em] text-[#b2054c]">{isSignIn ? 'Welcome back' : 'Join the bazaar'}</p>
+        <p className="mt-2 text-sm text-[#917872]">{isSignIn ? 'Your good things are waiting.' : 'Create an account for easier checkout and order updates.'}</p>
+      </div>
+      {isSignIn ? <SignIn
+        routing="path"
+        path={`${basePath}/sign-in`}
+        signUpUrl={`${basePath}/sign-up`}
+        fallbackRedirectUrl={`${basePath}/`}
+        appearance={clerkAppearance}
+      /> : <SignUp
+        routing="path"
+        path={`${basePath}/sign-up`}
+        signInUrl={`${basePath}/sign-in`}
+        fallbackRedirectUrl={`${basePath}/`}
+        appearance={clerkAppearance}
+      />}
+    </div>
+  </main>;
+}
+
+function AccountPage() {
+  const { user } = useUser();
+  const { signOut } = useClerk();
+  return <Shell><main className="mx-auto max-w-[900px] px-5 py-12 lg:px-8 lg:py-16">
+    <Show when="signed-in">
+      <div className="rounded-[2rem] bg-[#7ec151] p-8 md:p-12">
+        <p className="font-mono text-[10px] uppercase tracking-[.2em] text-[#285d28]">Your Bazaar</p>
+        <h1 className="mt-3 font-display text-5xl font-bold tracking-[-.07em] text-[#4d092b] md:text-7xl">Hello, {user?.firstName || 'friend'}<span className="text-[#d10056]">.</span></h1>
+        <p className="mt-5 max-w-md text-sm leading-6 text-[#285d28]">Your account keeps checkout simple and makes it easier to stay close to the good stuff.</p>
+      </div>
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
+        <div className="rounded-3xl border border-[#e5ded2] bg-[#fbfaf6] p-6"><p className="font-mono text-[10px] uppercase tracking-[.16em] text-[#b2054c]">Account details</p><p className="mt-5 font-bold text-[#4d092b]">{user?.fullName || 'Bazaar shopper'}</p><p className="mt-1 text-sm text-[#917872]">{user?.primaryEmailAddress?.emailAddress}</p></div>
+        <div className="rounded-3xl bg-[#ffb900] p-6"><p className="font-mono text-[10px] uppercase tracking-[.16em] text-[#4d092b]/65">Next move</p><h2 className="mt-3 font-display text-2xl font-bold text-[#4d092b]">Find a little wow.</h2><Link href="/shop" className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#b2054c] px-5 py-3 text-sm font-bold text-[#fffaf0]">Browse the shop <ArrowRight size={15} /></Link></div>
+      </div>
+      <button onClick={() => signOut({ redirectUrl: basePath || '/' })} className="mt-7 text-sm font-bold text-[#b2054c]">Sign out</button>
+    </Show>
+  </main></Shell>;
+}
+
+function ProtectedRoute({ children }: { children: ReactNode }) {
+  const { isLoaded, isSignedIn } = useAuth();
+  if (!isLoaded) return <Shell><main className="mx-auto max-w-[700px] px-5 py-24 text-center"><div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-[#d8cfc1] border-t-[#b2054c]" /></main></Shell>;
+  if (!isSignedIn) return <Redirect to="/sign-in" />;
+  return <>{children}</>;
+}
+
+function AdminRoute() {
+  const { isLoaded, isSignedIn } = useAuth();
+  const { user } = useUser();
+  if (!isLoaded) return <Shell><main className="mx-auto max-w-[700px] px-5 py-24 text-center"><div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-[#d8cfc1] border-t-[#b2054c]" /></main></Shell>;
+  if (!isSignedIn) return <Redirect to="/sign-in" />;
+  if (user?.publicMetadata?.role !== 'admin') return <Shell><main className="mx-auto max-w-[700px] px-5 py-24 text-center"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#ffb900] text-2xl text-[#4d092b]">!</div><h1 className="mt-7 font-display text-5xl font-bold tracking-[-.07em] text-[#4d092b]">Not your shelf.</h1><p className="mx-auto mt-4 max-w-sm text-sm leading-6 text-[#917872]">The dashboard is reserved for Bazaar admins.</p><Link href="/" className="mt-8 inline-flex items-center gap-2 rounded-full bg-[#b2054c] px-6 py-3.5 text-sm font-bold text-[#fffaf0]">Back to storefront <ArrowRight size={16} /></Link></main></Shell>;
+  return <AdminPage />;
+}
+
+function HomeRedirect() {
+  return <>
+    <Show when="signed-in"><Redirect to="/account" /></Show>
+    <Show when="signed-out"><HomePage /></Show>
+  </>;
+}
+
 function Router() {
   const [location] = useLocation();
-  return <ErrorBoundary resetKey={location}><Switch><Route path="/" component={HomePage} /><Route path="/shop" component={ShopPage} /><Route path="/product/:id" component={ProductPage} /><Route path="/cart" component={CartPage} /><Route path="/checkout" component={CheckoutPage} /><Route path="/order-success" component={OrderSuccessPage} /><Route path="/admin" component={AdminPage} /><Route component={NotFound} /></Switch></ErrorBoundary>;
+  return <ErrorBoundary resetKey={location}><Switch>
+    <Route path="/" component={HomeRedirect} />
+    <Route path="/shop" component={ShopPage} />
+    <Route path="/product/:id" component={ProductPage} />
+    <Route path="/cart" component={CartPage} />
+    <Route path="/checkout">{() => <ProtectedRoute><CheckoutPage /></ProtectedRoute>}</Route>
+    <Route path="/order-success" component={OrderSuccessPage} />
+    <Route path="/account">{() => <ProtectedRoute><AccountPage /></ProtectedRoute>}</Route>
+    <Route path="/sign-in/*?" component={() => <AuthPage mode="sign-in" />} />
+    <Route path="/sign-up/*?" component={() => <AuthPage mode="sign-up" />} />
+    <Route path="/dashboard" component={AdminRoute} />
+    <Route path="/admin" component={AdminRoute} />
+    <Route component={NotFound} />
+  </Switch></ErrorBoundary>;
+}
+
+function ClerkApp() {
+  const [, setLocation] = useLocation();
+  return <ClerkProvider
+    publishableKey={clerkPubKey}
+    proxyUrl={clerkProxyUrl}
+    appearance={clerkAppearance}
+    signInUrl={`${basePath}/sign-in`}
+    signUpUrl={`${basePath}/sign-up`}
+    localization={{ signIn: { start: { title: 'Sign in to Bazaar', subtitle: 'Welcome back. Please sign in to continue.' } }, signUp: { start: { title: 'Create your Bazaar account', subtitle: 'Join us for easier checkout and order updates.' } } }}
+    routerPush={(to) => setLocation(stripBase(to))}
+    routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
+  >
+    <QueryClientProvider client={queryClient}><TooltipProvider><CartProvider><Router /></CartProvider><Toaster /></TooltipProvider></QueryClientProvider>
+  </ClerkProvider>;
 }
 
 function App() {
-  return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><CartProvider><Router /></CartProvider></WouterRouter><Toaster /></TooltipProvider></QueryClientProvider>;
+  return <WouterRouter base={basePath}><ClerkApp /></WouterRouter>;
 }
 
 export default App;

@@ -3,6 +3,7 @@ import {
   CreateOrderBody,
   CreateOrderResponse,
 } from "@workspace/api-zod";
+import { requireAuth } from "../middlewares/auth";
 
 export const orders: Array<{
   id: string;
@@ -14,7 +15,7 @@ export const orders: Array<{
 
 const router: IRouter = Router();
 
-router.post("/orders", (req, res) => {
+router.post("/orders", requireAuth, (req, res) => {
   const parsed = CreateOrderBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Please check your order details" });

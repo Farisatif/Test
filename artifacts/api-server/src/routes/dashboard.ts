@@ -2,10 +2,11 @@ import { Router, type IRouter } from "express";
 import { GetDashboardSummaryResponse } from "@workspace/api-zod";
 import { products } from "./catalog";
 import { orders } from "./orders";
+import { requireAdmin } from "../middlewares/auth";
 
 const router: IRouter = Router();
 
-router.get("/dashboard/summary", (_req, res) => {
+router.get("/dashboard/summary", requireAdmin, (_req, res) => {
   const totalRevenue = orders.reduce((sum, order) => sum + order.total, 0);
   res.json(
     GetDashboardSummaryResponse.parse({

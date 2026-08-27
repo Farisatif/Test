@@ -1,1 +1,2 @@
 - [Orval and Zod compatibility](zod-orval-version.md) — verify generated Zod syntax against the workspace's installed Zod major version after API codegen.
+- [Clerk web/server entry points](clerk-entry-points.md) — the managed Clerk setup uses different package entry points for browser and Express key resolution.
