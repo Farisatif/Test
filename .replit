@@ -1,14 +1,23 @@
-modules = ["php-8.3", "nodejs-22"]
-run = "php artisan serve --host=0.0.0.0 --port=$PORT"
+modules = ["nodejs-24", "postgresql-16", "php-8.2"]
 
 [deployment]
 router = "application"
 deploymentTarget = "autoscale"
-run = ["php", "artisan", "serve", "--host=0.0.0.0", "--port=$PORT"]
 
-[deployment.env]
-APP_ENV = "production"
-APP_DEBUG = "false"
-SESSION_DRIVER = "file"
-CACHE_STORE = "file"
-QUEUE_CONNECTION = "sync"
+[deployment.postBuild]
+args = ["pnpm", "store", "prune"]
+env = { "CI" = "true" }
+
+[workflows]
+runButton = "Project"
+
+[agent]
+stack = "PNPM_WORKSPACE"
+expertMode = true
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 20000
+
+[nix]
+channel = "stable-25_05"
