@@ -50,10 +50,6 @@ const clerkPubKey = publishableKeyFromHost(
 );
 const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
 
-if (!clerkPubKey) {
-  throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY in .env file');
-}
-
 function stripBase(path: string): string {
   return basePath && path.startsWith(basePath)
     ? path.slice(basePath.length) || '/'
@@ -232,6 +228,29 @@ function Header() {
   </header>;
 }
 
+function GuestHeader() {
+  const { cartCount } = useCart();
+  return <header className="sticky top-0 z-40 border-b border-[#e5ded2] bg-[#f7f4ed]/95 backdrop-blur">
+    <div className="mx-auto flex h-[74px] max-w-[1400px] items-center justify-between gap-4 px-5 lg:px-8">
+      <Link href="/" data-testid="link-logo" className="group flex items-center gap-2">
+        <span className="flex h-9 w-9 rotate-[-8deg] items-center justify-center rounded-[11px] bg-[#b2054c] text-[#f7f4ed] transition-transform group-hover:rotate-0"><Sparkles size={19} /></span>
+        <span className="font-display text-2xl font-bold tracking-[-.06em] text-[#4d092b]">bazaar<span className="text-[#d10056]">.</span></span>
+      </Link>
+      <nav className="hidden items-center gap-8 md:flex">
+        <Link href="/" className="text-sm font-bold text-[#6e504f] hover:text-[#b2054c]">Home</Link>
+        <Link href="/shop" className="text-sm font-bold text-[#6e504f] hover:text-[#b2054c]">Shop</Link>
+        <Link href="/shop?category=New" className="text-sm font-bold text-[#6e504f] hover:text-[#b2054c]">New in</Link>
+      </nav>
+      <div className="flex items-center gap-1">
+        <Link href="/shop" data-testid="link-search" className="rounded-full p-2.5 text-[#4d092b] hover:bg-[#ece6d9]"><Search size={19} /></Link>
+        <Link href="/cart" data-testid="link-cart" className="relative rounded-full p-2.5 text-[#4d092b] hover:bg-[#ece6d9]"><ShoppingBag size={20} />
+          {cartCount > 0 && <span data-testid="text-cart-count" className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#ffb900] px-1 font-mono text-[10px] font-bold text-[#4d092b]">{cartCount}</span>}
+        </Link>
+      </div>
+    </div>
+  </header>;
+}
+
 function Footer() {
   return <footer className="mt-24 border-t border-[#e5ded2] bg-[#4d092b] text-[#f7f4ed]">
     <div className="mx-auto grid max-w-[1400px] gap-10 px-5 py-14 md:grid-cols-[1.3fr_1fr_1fr_1fr] lg:px-8">
@@ -245,7 +264,7 @@ function Footer() {
 }
 
 function Shell({ children }: { children: ReactNode }) {
-  return <div className="bazaar-grain min-h-[100dvh] bg-[#f7f4ed]"><Header />{children}<Footer /></div>;
+  return <div className="bazaar-grain min-h-[100dvh] bg-[#f7f4ed]">{clerkPubKey ? <Header /> : <GuestHeader />}{children}<Footer /></div>;
 }
 
 function ProductCard({ product, index = 0 }: { product: Product; index?: number }) {
@@ -436,10 +455,29 @@ function AdminRoute() {
 }
 
 function HomeRedirect() {
-  return <>
-    <Show when="signed-in"><Redirect to="/account" /></Show>
-    <Show when="signed-out"><HomePage /></Show>
-  </>;
+  return <HomePage />;
+}
+
+function GuestPage({ title, body }: { title: string; body: string }) {
+  return <Shell><main className="mx-auto max-w-[700px] px-5 py-24 text-center"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#ffb900] text-2xl text-[#4d092b]">!</div><h1 className="mt-7 font-display text-5xl font-bold tracking-[-.07em] text-[#4d092b]">{title}</h1><p className="mx-auto mt-4 max-w-sm text-sm leading-6 text-[#917872]">{body}</p><Link href="/shop" className="mt-8 inline-flex items-center gap-2 rounded-full bg-[#b2054c] px-6 py-3.5 text-sm font-bold text-[#fffaf0]">Browse the shop <ArrowRight size={16} /></Link></main></Shell>;
+}
+
+function GuestRouter() {
+  const [location] = useLocation();
+  return <ErrorBoundary resetKey={location}><Switch>
+    <Route path="/" component={HomePage} />
+    <Route path="/shop" component={ShopPage} />
+    <Route path="/product/:id" component={ProductPage} />
+    <Route path="/cart" component={CartPage} />
+    <Route path="/checkout" component={CheckoutPage} />
+    <Route path="/order-success" component={OrderSuccessPage} />
+    <Route path="/sign-in/*?"><GuestPage title="Guest checkout is ready." body="You can browse the Bazaar without an account. Sign-in can be enabled later by adding your Clerk key." /></Route>
+    <Route path="/sign-up/*?"><GuestPage title="Create an account later." body="The storefront is available now. Add your Clerk configuration when you want customer accounts." /></Route>
+    <Route path="/account"><GuestPage title="Your account is optional." body="Browse and test the storefront first, then enable accounts when your Clerk credentials are configured." /></Route>
+    <Route path="/dashboard"><GuestPage title="Dashboard needs an admin account." body="The Laravel API is ready; connect authentication before enabling the admin dashboard." /></Route>
+    <Route path="/admin"><GuestPage title="Dashboard needs an admin account." body="The Laravel API is ready; connect authentication before enabling the admin dashboard." /></Route>
+    <Route component={NotFound} />
+  </Switch></ErrorBoundary>;
 }
 
 function Router() {
@@ -477,7 +515,9 @@ function ClerkApp() {
 }
 
 function App() {
-  return <WouterRouter base={basePath}><ClerkApp /></WouterRouter>;
+  return <WouterRouter base={basePath}>
+    {clerkPubKey ? <ClerkApp /> : <QueryClientProvider client={queryClient}><TooltipProvider><CartProvider><GuestRouter /></CartProvider><Toaster /></TooltipProvider></QueryClientProvider>}
+  </WouterRouter>;
 }
 
 export default App;
